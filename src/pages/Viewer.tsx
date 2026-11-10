@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import type { AppData, Person } from '../types';
+import type { AppData } from '../types';
 import { fetchSheetData } from '../services/sheet';
 import { getImageUrl, getDownloadUrl, getViewUrl } from '../utils/drive';
 
@@ -91,9 +90,6 @@ export default function Viewer() {
               Tải tất cả
             </button>
           )}
-          <Link to="/admin" className="btn ghost">
-            Admin
-          </Link>
         </div>
       </header>
 
