@@ -1,4 +1,4 @@
-import { AppData } from '../types';
+import type { AppData } from '../types';
 
 interface Props {
   data: AppData;

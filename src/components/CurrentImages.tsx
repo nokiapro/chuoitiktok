@@ -1,4 +1,4 @@
-import { Person } from '../types';
+import type { Person } from '../types';
 import { getImageUrl, getDownloadUrl, getViewUrl } from '../utils/drive';
 
 interface Props {

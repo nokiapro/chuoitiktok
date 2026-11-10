@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { AppData, DEFAULT_DATA, Person } from '../types';
+import { DEFAULT_DATA } from '../types';
+import type { AppData, Person } from '../types';
 
 const STORAGE_KEY = 'streak-web-data-v1';
 
