@@ -5,16 +5,7 @@ import Admin from './pages/Admin';
 import './App.css';
 
 function App() {
-  const {
-    data,
-    updatePeople,
-    setPersonDay,
-    advanceAll,
-    addOrUpdateImage,
-    removeImage,
-    importData,
-    resetData,
-  } = useAppData();
+  const { data, updatePeople } = useAppData();
 
   return (
     <BrowserRouter>
@@ -25,14 +16,8 @@ function App() {
             path="/admin"
             element={
               <Admin
-                data={data}
-                updatePeople={updatePeople}
-                setPersonDay={setPersonDay}
-                advanceAll={advanceAll}
-                addOrUpdateImage={addOrUpdateImage}
-                removeImage={removeImage}
-                importData={importData}
-                resetData={resetData}
+                people={data.people}
+                onUpdatePeople={updatePeople}
               />
             }
           />

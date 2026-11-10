@@ -512,3 +512,7 @@ input:focus {
   margin-bottom: 16px;
   font-size: 0.9rem;
 }
+
+.admin-person {
+  grid-template-columns: 1fr 80px auto;
+}
