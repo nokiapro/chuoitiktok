@@ -31,7 +31,7 @@ export default function Admin({
       <header className="admin-header">
         <div>
           <h1>Admin</h1>
-          <p>Quản lý người & ảnh</p>
+          <p>Quản lý tạm · Dữ liệu chính nằm ở Google Sheet</p>
         </div>
         <Link to="/" className="btn">
           ← Về trang chính
@@ -60,9 +60,17 @@ export default function Admin({
       </div>
 
       <div className="admin-note">
-        <strong>Lưu ý:</strong> Dữ liệu được lưu tạm trên trình duyệt. 
-        Hãy thường xuyên bấm <b>Xuất JSON</b> để lưu thành file backup. 
-        Khi sang máy/điện thoại khác, dùng <b>Import JSON</b> để khôi phục.
+        <strong>Cách dùng với Google Sheet:</strong>
+        <br />
+        1. Dùng trang này để thêm ảnh / chỉnh ngày tạm thời
+        <br />
+        2. Bấm <b>Xuất JSON</b> hoặc copy thủ công sang Google Sheet
+        <br />
+        3. Tab <b>People</b>: cột id, name, currentDay
+        <br />
+        4. Tab <b>Images</b>: cột day, fileId (hoặc FILELD)
+        <br />
+        5. Về trang chính bấm <b>Làm mới</b> để thấy dữ liệu mới từ Sheet
       </div>
     </div>
   );

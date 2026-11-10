@@ -20,16 +20,7 @@ function App() {
     <BrowserRouter>
       <div className="app">
         <Routes>
-          <Route
-            path="/"
-            element={
-              <Viewer
-                people={data.people}
-                images={data.images}
-                onAdvanceAll={advanceAll}
-              />
-            }
-          />
+          <Route path="/" element={<Viewer />} />
           <Route
             path="/admin"
             element={

@@ -478,3 +478,37 @@ input:focus {
     grid-column: span 2;
   }
 }
+
+/* Loading & Error states */
+.loading-state,
+.error-state,
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+}
+
+.error-state p {
+  margin-bottom: 16px;
+  color: var(--danger);
+}
+
+.empty-state .muted {
+  margin-top: 8px;
+  font-size: 0.9rem;
+}
+
+.last-updated {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.banner-error {
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  color: var(--danger);
+  padding: 10px 14px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+}
