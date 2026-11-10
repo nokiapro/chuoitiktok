@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { DEFAULT_DATA } from '../types';
 import type { AppData, Person } from '../types';
 
-const STORAGE_KEY = 'streak-web-data-v1';
+const STORAGE_KEY = 'streak-web-data-v2';
 
 export function useAppData() {
   const [data, setData] = useState<AppData>(() => {
@@ -10,7 +10,6 @@ export function useAppData() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as AppData;
-        // Basic validation
         if (parsed.people && parsed.images) return parsed;
       }
     } catch {
@@ -19,12 +18,12 @@ export function useAppData() {
     return DEFAULT_DATA;
   });
 
-  // Persist whenever data changes
+  // Auto save to localStorage (for convenience on same device)
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (e) {
-      console.error('Failed to save to localStorage', e);
+      console.error('Failed to save', e);
     }
   }, [data]);
 
