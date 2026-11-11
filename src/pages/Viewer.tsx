@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react';
-import type { AppData } from '../types';
+import type { AppData, Person } from '../types';
 import { fetchSheetData } from '../services/sheet';
 import { getImageUrl, getDownloadUrl, getViewUrl } from '../utils/drive';
 
+const ADVANCE_URL =
+  'https://script.google.com/macros/s/AKfycbyUibvFnuq5jrH6nEKSvksu4yxvym4g_zNIdD4DHVs-AIJJ0R8gLIrnzqf5xpbD4BO-iQ/exec';
+const SECRET = '12051994';
+
 export default function Viewer() {
   const [data, setData] = useState<AppData | null>(null);
+  const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
+  const [advancing, setAdvancing] = useState(false);
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const loadData = async () => {
@@ -15,6 +22,7 @@ export default function Viewer() {
     try {
       const result = await fetchSheetData();
       setData(result);
+      setPeople(result.people);
       setLastUpdated(new Date());
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Lỗi tải dữ liệu');
@@ -27,14 +35,48 @@ export default function Viewer() {
     loadData();
   }, []);
 
+  const handleAdvance = async () => {
+    if (advancing) return;
+    if (!confirm('Tăng +1 ngày cho tất cả người và lưu vào Google Sheet?')) return;
+
+    setAdvancing(true);
+    setError('');
+    setInfo('');
+
+    try {
+      const url = `${ADVANCE_URL}?action=advance&secret=${encodeURIComponent(SECRET)}`;
+      const res = await fetch(url, { method: 'GET', redirect: 'follow' });
+      const text = await res.text();
+
+      let json: { ok?: boolean; error?: string; message?: string; updated?: number };
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error('Phản hồi từ script không hợp lệ. Kiểm tra lại deploy Apps Script.');
+      }
+
+      if (!json.ok) {
+        throw new Error(json.error || 'Không thể tăng ngày');
+      }
+
+      setInfo(json.message || `Đã tăng +1 cho ${json.updated ?? ''} người`);
+      // Tải lại dữ liệu mới từ Sheet
+      await loadData();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Lỗi khi tăng ngày');
+    } finally {
+      setAdvancing(false);
+    }
+  };
+
   const handleDownloadAll = () => {
     if (!data) return;
-    data.people.forEach((p) => {
+    people.forEach((p) => {
       const fileId = data.images[String(p.currentDay)];
       if (fileId) {
         const a = document.createElement('a');
         a.href = getDownloadUrl(fileId);
-        a.download = `ngay_${p.currentDay}.png`;
+        a.download = `ngay_${p.currentDay}_${p.name}.png`;
         a.target = '_blank';
         a.click();
       }
@@ -44,7 +86,10 @@ export default function Viewer() {
   if (loading && !data) {
     return (
       <div className="viewer">
-        <div className="loading-state">Đang tải dữ liệu từ Google Sheet...</div>
+        <div className="loading-state">
+          <div className="spinner" />
+          <p>Đang tải dữ liệu...</p>
+        </div>
       </div>
     );
   }
@@ -62,54 +107,60 @@ export default function Viewer() {
     );
   }
 
-  const people = data?.people || [];
   const images = data?.images || {};
   const availableCount = people.filter((p) => images[String(p.currentDay)]).length;
 
   return (
     <div className="viewer">
       <header className="viewer-header">
-        <div>
+        <div className="header-left">
           <h1>Streak</h1>
-          <p>
+          <p className="subtitle">
             Chuỗi ngày hôm nay
             {lastUpdated && (
               <span className="last-updated">
-                {' '}
-                · Cập nhật {lastUpdated.toLocaleTimeString('vi-VN')}
+                · {lastUpdated.toLocaleTimeString('vi-VN')}
               </span>
             )}
           </p>
         </div>
+
         <div className="viewer-actions">
-          <button className="btn" onClick={loadData} disabled={loading}>
+          <button className="btn" onClick={loadData} disabled={loading || advancing}>
             {loading ? 'Đang tải...' : 'Làm mới'}
           </button>
+          <button
+            className="btn primary"
+            onClick={handleAdvance}
+            disabled={loading || advancing}
+          >
+            {advancing ? 'Đang lưu...' : 'Nâng +1 ngày'}
+          </button>
           {availableCount > 0 && (
-            <button className="btn primary" onClick={handleDownloadAll}>
-              Tải tất cả
+            <button className="btn accent" onClick={handleDownloadAll}>
+              Tải tất cả ({availableCount})
             </button>
           )}
         </div>
       </header>
 
-      {error && (
-        <div className="banner-error">
-          {error} — đang hiện dữ liệu cũ
-        </div>
-      )}
+      {error && <div className="banner-error">{error}</div>}
+      {info && <div className="banner-info">{info}</div>}
 
       {people.length === 0 ? (
         <div className="empty-state">
           <p>Chưa có dữ liệu người trong Google Sheet.</p>
-          <p className="muted">Hãy thêm dòng vào tab <b>People</b>.</p>
+          <p className="muted">Thêm dòng vào tab <b>People</b>.</p>
         </div>
       ) : (
         <div className="viewer-grid">
           {people.map((person) => {
             const fileId = images[String(person.currentDay)];
             return (
-              <div key={person.id} className="viewer-card">
+              <div
+                key={person.id}
+                className={`viewer-card ${fileId ? 'has-image' : ''}`}
+              >
                 <div className="viewer-card-header">
                   <span className="person-name">{person.name}</span>
                   <span className="day-chip">Ngày {person.currentDay}</span>
@@ -129,7 +180,7 @@ export default function Viewer() {
                         loading="lazy"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src =
-                            'https://placehold.co/300x300/1a1a20/666?text=No+Image';
+                            'https://placehold.co/300x300/16161d/555?text=No+Image';
                         }}
                       />
                     </a>
