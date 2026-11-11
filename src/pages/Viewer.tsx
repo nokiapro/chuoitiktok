@@ -60,7 +60,6 @@ export default function Viewer() {
       }
 
       setInfo(json.message || `Đã tăng +1 cho ${json.updated ?? ''} người`);
-      // Tải lại dữ liệu mới từ Sheet
       await loadData();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Lỗi khi tăng ngày');
@@ -153,26 +152,22 @@ export default function Viewer() {
           <p className="muted">Thêm dòng vào tab <b>People</b>.</p>
         </div>
       ) : (
-        <div className="viewer-grid">
-          {people.map((person) => {
+        <div className="list">
+          {people.map((person, index) => {
             const fileId = images[String(person.currentDay)];
             return (
               <div
                 key={person.id}
-                className={`viewer-card ${fileId ? 'has-image' : ''}`}
+                className={`list-item ${fileId ? 'has-image' : ''}`}
+                style={{ animationDelay: `${index * 40}ms` }}
               >
-                <div className="viewer-card-header">
-                  <span className="person-name">{person.name}</span>
-                  <span className="day-chip">Ngày {person.currentDay}</span>
-                </div>
-
-                {fileId ? (
-                  <>
+                <div className="list-thumb">
+                  {fileId ? (
                     <a
                       href={getViewUrl(fileId)}
                       target="_blank"
                       rel="noreferrer"
-                      className="viewer-img"
+                      className="thumb-link"
                     >
                       <img
                         src={getImageUrl(fileId)}
@@ -180,18 +175,37 @@ export default function Viewer() {
                         loading="lazy"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src =
-                            'https://placehold.co/300x300/16161d/555?text=No+Image';
+                            'https://placehold.co/120x120/16161d/555?text=—';
                         }}
                       />
                     </a>
-                    <div className="viewer-card-actions">
+                  ) : (
+                    <div className="thumb-empty">
+                      <span>—</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="list-body">
+                  <div className="list-top">
+                    <span className="person-name">{person.name}</span>
+                    <span className="day-chip">Ngày {person.currentDay}</span>
+                  </div>
+                  <div className="list-meta">
+                    {fileId ? 'Có ảnh' : 'Chưa có ảnh'}
+                  </div>
+                </div>
+
+                <div className="list-actions">
+                  {fileId ? (
+                    <>
                       <a
                         className="btn small primary"
                         href={getDownloadUrl(fileId)}
                         target="_blank"
                         rel="noreferrer"
                       >
-                        Tải về
+                        Tải
                       </a>
                       <a
                         className="btn small"
@@ -201,14 +215,11 @@ export default function Viewer() {
                       >
                         Mở
                       </a>
-                    </div>
-                  </>
-                ) : (
-                  <div className="viewer-empty">
-                    <span>Chưa có ảnh</span>
-                    <small>Ngày {person.currentDay}</small>
-                  </div>
-                )}
+                    </>
+                  ) : (
+                    <span className="no-action">—</span>
+                  )}
+                </div>
               </div>
             );
           })}
