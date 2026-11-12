@@ -1,6 +1,7 @@
 import type { AppData, Person, User } from '../types';
 
-const SHEET_ID = '1LyK_EwY01BRKrEjLxfWww4lCwD3U5vLe4enNlCcFJrg';
+const SHEET_ID = '1VoLBFNqRTW-gheRHlXh4glhE32Z5TXk3oRiC2nQLCB0';
+const USERS_GID = '1222537680';
 
 function parseCSV(text: string): string[][] {
   const rows: string[][] = [];
@@ -59,98 +60,118 @@ function clean(v: string | undefined): string {
   return (v || '').replace(/^"|"$/g, '').trim();
 }
 
-export async function fetchSheetData(): Promise<AppData> {
-  const base = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=`;
+function looksLikeHtml(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  return t.startsWith('<!doctype') || t.startsWith('<html') || t.includes('window[\'ppconfig\']');
+}
 
-  const [usersRes, peopleRes, imagesRes] = await Promise.all([
-    fetch(base + 'Users'),
-    fetch(base + 'People'),
-    fetch(base + 'Images'),
-  ]);
-
-  if (!usersRes.ok || !peopleRes.ok || !imagesRes.ok) {
-    throw new Error(
-      'Không thể tải dữ liệu từ Google Sheet. Kiểm tra quyền chia sẻ (Anyone with the link) và tên tab Users / People / Images.'
-    );
+async function fetchCsv(url: string): Promise<string[][] | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const text = await res.text();
+    if (!text || looksLikeHtml(text)) return null;
+    const rows = parseCSV(text);
+    if (rows.length === 0) return null;
+    return rows;
+  } catch {
+    return null;
   }
+}
 
-  const [usersText, peopleText, imagesText] = await Promise.all([
-    usersRes.text(),
-    peopleRes.text(),
-    imagesRes.text(),
-  ]);
+function parseUsers(rows: string[][]): User[] {
+  const headers = rows[0].map(normalizeHeader);
+  // Phải có cột secret mới coi là tab Users thật
+  const secretIdx = headers.findIndex((h) => h === 'secret');
+  if (secretIdx === -1) return [];
 
-  const usersRows = parseCSV(usersText);
-  const peopleRows = parseCSV(peopleText);
-  const imagesRows = parseCSV(imagesText);
+  const idIdx = headers.findIndex(
+    (h) => h === 'user_id' || h === 'userid' || h === 'id'
+  );
+  const nameIdx = headers.findIndex((h) => h === 'name');
 
-  // Users
   const users: User[] = [];
-  if (usersRows.length > 0) {
-    const headers = usersRows[0].map(normalizeHeader);
-    const idIdx = headers.findIndex((h) => h === 'user_id' || h === 'userid' || h === 'id');
-    const nameIdx = headers.findIndex((h) => h === 'name');
-    const secretIdx = headers.findIndex((h) => h === 'secret');
-
-    for (let i = 1; i < usersRows.length; i++) {
-      const row = usersRows[i];
-      const id = clean(row[idIdx]);
-      const name = clean(row[nameIdx]) || id;
-      const secret = clean(row[secretIdx]);
-      if (id && secret) {
-        users.push({ id, name, secret });
-      }
-    }
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const id = clean(row[idIdx]) || `u${i}`;
+    const name = clean(row[nameIdx]) || id;
+    const secret = clean(row[secretIdx]);
+    if (secret) users.push({ id, name, secret });
   }
+  return users;
+}
 
-  // People
+function parsePeople(rows: string[][]): Person[] {
+  if (rows.length === 0) return [];
+  const headers = rows[0].map(normalizeHeader);
+  const idIdx = headers.findIndex((h) => h === 'id');
+  const userIdIdx = headers.findIndex(
+    (h) => h === 'user_id' || h === 'userid' || h === 'user'
+  );
+  const nameIdx = headers.findIndex((h) => h === 'name');
+  const dayIdx = headers.findIndex(
+    (h) => h === 'currentday' || h === 'current_day'
+  );
+
   const people: Person[] = [];
-  if (peopleRows.length > 0) {
-    const headers = peopleRows[0].map(normalizeHeader);
-    const idIdx = headers.findIndex((h) => h === 'id');
-    const userIdIdx = headers.findIndex(
-      (h) => h === 'user_id' || h === 'userid' || h === 'user'
-    );
-    const nameIdx = headers.findIndex((h) => h === 'name');
-    const dayIdx = headers.findIndex(
-      (h) => h === 'currentday' || h === 'current_day'
-    );
-
-    for (let i = 1; i < peopleRows.length; i++) {
-      const row = peopleRows[i];
-      const id = clean(row[idIdx]) || String(i);
-      const userId = clean(row[userIdIdx]);
-      const name = clean(row[nameIdx]) || `Người ${i}`;
-      const currentDay = parseInt(clean(row[dayIdx]) || '1', 10) || 1;
-
-      // Nếu chưa có cột USER_ID thì gán tạm 'default' để tương thích sheet cũ
-      people.push({
-        id,
-        userId: userId || 'default',
-        name,
-        currentDay,
-      });
-    }
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const id = clean(row[idIdx]) || String(i);
+    const userId = userIdIdx >= 0 ? clean(row[userIdIdx]) : '';
+    const name = clean(row[nameIdx]) || `Người ${i}`;
+    const currentDay = parseInt(clean(row[dayIdx]) || '1', 10) || 1;
+    people.push({
+      id,
+      userId: userId || 'u1', // mặc định u1 nếu chưa có cột USER_ID
+      name,
+      currentDay,
+    });
   }
+  return people;
+}
 
-  // Images
+function parseImages(rows: string[][]): Record<string, string> {
   const images: Record<string, string> = {};
-  if (imagesRows.length > 0) {
-    const headers = imagesRows[0].map(normalizeHeader);
-    const dayIdx = headers.findIndex((h) => h === 'day');
-    const fileIdx = headers.findIndex(
-      (h) => h === 'fileid' || h === 'fileld' || h === 'file_id'
-    );
-
-    for (let i = 1; i < imagesRows.length; i++) {
-      const row = imagesRows[i];
-      const day = clean(row[dayIdx]);
-      const fileId = clean(row[fileIdx]);
-      if (day && fileId) {
-        images[day] = fileId;
-      }
-    }
+  if (rows.length === 0) return images;
+  const headers = rows[0].map(normalizeHeader);
+  const dayIdx = headers.findIndex((h) => h === 'day');
+  const fileIdx = headers.findIndex(
+    (h) => h === 'fileid' || h === 'fileld' || h === 'file_id'
+  );
+  for (let i = 1; i < rows.length; i++) {
+    const day = clean(rows[i][dayIdx]);
+    const fileId = clean(rows[i][fileIdx]);
+    if (day && fileId) images[day] = fileId;
   }
+  return images;
+}
+
+export async function fetchSheetData(): Promise<AppData> {
+  const baseGviz = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv`;
+  const baseExport = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+
+  // Users: thử theo tên, rồi theo gid
+  let usersRows =
+    (await fetchCsv(`${baseGviz}&sheet=Users`)) ||
+    (await fetchCsv(`${baseGviz}&gid=${USERS_GID}`)) ||
+    (await fetchCsv(`${baseExport}&gid=${USERS_GID}`));
+
+  let users = usersRows ? parseUsers(usersRows) : [];
+
+  // Fallback: nếu không đọc được Users tab → 1 user mặc định
+  if (users.length === 0) {
+    users = [{ id: 'u1', name: 'XuanKen', secret: '12051994' }];
+  }
+
+  const peopleRows =
+    (await fetchCsv(`${baseGviz}&sheet=People`)) ||
+    (await fetchCsv(`${baseGviz}&gid=0`));
+  const people = peopleRows ? parsePeople(peopleRows) : [];
+
+  const imagesRows =
+    (await fetchCsv(`${baseGviz}&sheet=Images`)) ||
+    (await fetchCsv(`${baseGviz}&gid=1913989790`));
+  const images = imagesRows ? parseImages(imagesRows) : {};
 
   return { users, people, images };
 }
