@@ -5,6 +5,7 @@ import {
   getImageUrl,
   getViewUrl,
   downloadImage,
+  downloadImagesSeparate,
 } from '../utils/drive';
 
 const ADVANCE_URL =
@@ -164,21 +165,37 @@ export default function Viewer() {
     setError('');
     setInfo('');
     try {
-      let count = 0;
-      for (const p of people) {
-        const fileId = data.images[String(p.currentDay)];
-        if (fileId) {
-          await downloadImage(fileId, `ngay_${p.currentDay}_${p.name}`);
-          count++;
-          // Chờ nhẹ để tránh chặn popup/share liên tục
-          await new Promise((r) => setTimeout(r, 400));
-        }
-      }
-      if (count === 0) {
+      const items = people
+        .map((p) => {
+          const fileId = data.images[String(p.currentDay)];
+          if (!fileId) return null;
+          return {
+            fileId,
+            filename: `ngay_${p.currentDay}_${p.name}`,
+          };
+        })
+        .filter((x): x is { fileId: string; filename: string } => !!x);
+
+      if (items.length === 0) {
         setInfo('Không có ảnh nào để tải');
-      } else {
-        setInfo(`Đã xử lý ${count} ảnh`);
+        return;
       }
+
+      const { saved, failed } = await downloadImagesSeparate(
+        items,
+        (done, total, phase) => {
+          if (phase === 'fetch') {
+            setInfo(`Đang lấy ảnh ${done}/${total}...`);
+          } else {
+            setInfo(`Đang lưu ảnh ${done}/${total}...`);
+          }
+        }
+      );
+
+      if (failed.length) {
+        setError(`Thiếu ${failed.length} ảnh: ${failed.join(', ')}`);
+      }
+      setInfo(`Đã tải ${saved}/${items.length} ảnh`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Lỗi khi tải ảnh');
     } finally {
