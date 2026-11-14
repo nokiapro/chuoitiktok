@@ -8,7 +8,7 @@ import {
 } from '../utils/drive';
 
 const ADVANCE_URL =
-  'https://script.google.com/macros/s/AKfycbwBgq9PCtdyRJcL0OyzeLDzio4TmTpoGDCg0GH-ZtxkfotdYP14N1l9TFQzcpEeLeqC/exec';
+  'https://script.google.com/macros/s/AKfycbxKb-sn_5PShthkgPo7dQmFGi9KCw0WZFG9pdEY4FdClhaMXwDch2e9WYJJ9a-7OGeE/exec';
 const STORAGE_KEY = 'streak-user-secret';
 
 export default function Viewer() {
