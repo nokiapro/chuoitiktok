@@ -13,7 +13,7 @@ export function getViewUrl(fileId: string): string {
 }
 
 /**
- * Link tải qua server Vercel (không hỏi tài khoản Google)
+ * Link tải qua server Vercel
  */
 export function getProxyDownloadUrl(fileId: string, filename: string): string {
   const name = encodeURIComponent(filename);
@@ -21,7 +21,7 @@ export function getProxyDownloadUrl(fileId: string, filename: string): string {
 }
 
 /**
- * Tải ảnh về máy qua proxy cùng domain
+ * Tải ảnh về máy qua proxy cùng domain (không hỏi account Google)
  */
 export async function downloadImage(
   fileId: string,
@@ -36,14 +36,17 @@ export async function downloadImage(
       : `${filename}.png`;
 
   const url = getProxyDownloadUrl(fileId, safeName);
-
-  // Tải về thành blob từ domain của mình
   const res = await fetch(url);
+
   if (!res.ok) {
-    const errText = await res.text().catch(() => '');
-    throw new Error(
-      errText || 'Không tải được ảnh. Kiểm tra file Drive đã share công khai chưa.'
-    );
+    let msg = 'Không tải được ảnh.';
+    try {
+      const data = await res.json();
+      if (data?.error) msg = data.error;
+    } catch {
+      // ignore
+    }
+    throw new Error(msg);
   }
 
   const blob = await res.blob();
@@ -66,7 +69,7 @@ export async function downloadImage(
     }
   }
 
-  // Tải thẳng về máy
+  // Tải thẳng
   const objUrl = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = objUrl;
