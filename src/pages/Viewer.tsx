@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { AppData, Person, User } from '../types';
 import { fetchSheetData } from '../services/sheet';
-import { getImageUrl, getDownloadUrl, getViewUrl } from '../utils/drive';
+import {
+  getImageUrl,
+  getViewUrl,
+  downloadImage,
+} from '../utils/drive';
 
 const ADVANCE_URL =
   'https://script.google.com/macros/s/AKfycbwBgq9PCtdyRJcL0OyzeLDzio4TmTpoGDCg0GH-ZtxkfotdYP14N1l9TFQzcpEeLeqC/exec';
@@ -13,11 +17,11 @@ export default function Viewer() {
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [advancing, setAdvancing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Login form
   const [secretInput, setSecretInput] = useState('');
   const [loginError, setLoginError] = useState('');
 
@@ -37,12 +41,10 @@ export default function Viewer() {
 
       const active = currentUser || user;
       if (active) {
-        // Tìm lại user theo secret (phòng khi sheet đổi)
         const matched = result.users.find((u) => u.secret === active.secret);
         if (matched) {
           applyUser(result, matched);
         } else {
-          // Secret không còn hợp lệ
           setUser(null);
           setPeople([]);
           localStorage.removeItem(STORAGE_KEY);
@@ -56,7 +58,6 @@ export default function Viewer() {
     }
   };
 
-  // Lần đầu: thử đăng nhập từ localStorage
   useEffect(() => {
     const boot = async () => {
       setLoading(true);
@@ -145,21 +146,46 @@ export default function Viewer() {
     }
   };
 
-  const handleDownloadAll = () => {
-    if (!data) return;
-    people.forEach((p) => {
-      const fileId = data.images[String(p.currentDay)];
-      if (fileId) {
-        const a = document.createElement('a');
-        a.href = getDownloadUrl(fileId);
-        a.download = `ngay_${p.currentDay}_${p.name}.png`;
-        a.target = '_blank';
-        a.click();
-      }
-    });
+  const handleDownloadOne = async (fileId: string, day: number, name: string) => {
+    setDownloading(true);
+    setError('');
+    try {
+      await downloadImage(fileId, `ngay_${day}_${name}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Không tải được ảnh');
+    } finally {
+      setDownloading(false);
+    }
   };
 
-  // Loading lần đầu
+  const handleDownloadAll = async () => {
+    if (!data || downloading) return;
+    setDownloading(true);
+    setError('');
+    setInfo('');
+    try {
+      let count = 0;
+      for (const p of people) {
+        const fileId = data.images[String(p.currentDay)];
+        if (fileId) {
+          await downloadImage(fileId, `ngay_${p.currentDay}_${p.name}`);
+          count++;
+          // Chờ nhẹ để tránh chặn popup/share liên tục
+          await new Promise((r) => setTimeout(r, 400));
+        }
+      }
+      if (count === 0) {
+        setInfo('Không có ảnh nào để tải');
+      } else {
+        setInfo(`Đã xử lý ${count} ảnh`);
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Lỗi khi tải ảnh');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (loading && !data) {
     return (
       <div className="viewer">
@@ -184,7 +210,6 @@ export default function Viewer() {
     );
   }
 
-  // Chưa đăng nhập
   if (!user) {
     return (
       <div className="viewer">
@@ -233,20 +258,24 @@ export default function Viewer() {
           <button
             className="btn"
             onClick={() => loadData(user)}
-            disabled={loading || advancing}
+            disabled={loading || advancing || downloading}
           >
             {loading ? 'Đang tải...' : 'Làm mới'}
           </button>
           <button
             className="btn primary"
             onClick={handleAdvance}
-            disabled={loading || advancing}
+            disabled={loading || advancing || downloading}
           >
             {advancing ? 'Đang lưu...' : 'Nâng +1 ngày'}
           </button>
           {availableCount > 0 && (
-            <button className="btn accent" onClick={handleDownloadAll}>
-              Tải ({availableCount})
+            <button
+              className="btn accent"
+              onClick={handleDownloadAll}
+              disabled={downloading}
+            >
+              {downloading ? 'Đang tải...' : `Tải (${availableCount})`}
             </button>
           )}
           <button className="btn ghost" onClick={handleLogout}>
@@ -286,6 +315,7 @@ export default function Viewer() {
                       <img
                         src={getImageUrl(fileId)}
                         alt={`Ngày ${person.currentDay}`}
+                        referrerPolicy="no-referrer"
                         loading="lazy"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src =
@@ -313,14 +343,19 @@ export default function Viewer() {
                 <div className="list-actions">
                   {fileId ? (
                     <>
-                      <a
+                      <button
                         className="btn small primary"
-                        href={getDownloadUrl(fileId)}
-                        target="_blank"
-                        rel="noreferrer"
+                        disabled={downloading}
+                        onClick={() =>
+                          handleDownloadOne(
+                            fileId,
+                            person.currentDay,
+                            person.name
+                          )
+                        }
                       >
                         Tải
-                      </a>
+                      </button>
                       <a
                         className="btn small"
                         href={getViewUrl(fileId)}
